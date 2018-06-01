@@ -1,0 +1,106 @@
+---
+title: "Stamps Report"
+author: "Alberto Castillo"
+date: "5/31/2018"
+output: html_document
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(dplyr)
+
+Purchase_Data <- readxl::read_excel("2018-03-12 Stamps.com Excel assessment.xlsx", 
+                            sheet = "Purchase Payment Data")
+Purchase_Data$Date <- as.Date(Purchase_Data$Date, format = '%m/%d/%Y')
+Purchase_Data <- Purchase_Data %>%
+  mutate(month = format(Date, "%m"))
+```
+
+
+## Show total amount of purchases in each month by each company 
+Here we create a stacked bar graph to visualize how many purchases occured by every month for each company.
+We can clearly the the numbers in white for each customer. The stacked bar graph is in order exactly like the legend so as you move down each square you would follow along with the legend.
+```{r fig.width=10, fig.height=6}
+Purchase_Data %>%
+  ggplot(aes(x = format(Date, "%Y-%m"), fill = Company))+
+  geom_bar(color = 'Black') +
+  labs(x = 'Month', y = "Count of Purchases by Month", title = "How many Purchases by Companies every Month")+
+  geom_text(stat = 'count', aes(label=..count..), size = 3, position = position_stack(vjust = 0.5), color="white")
+  
+```
+
+## Billing for each Company at the end of the month. This is the largest bill that Stamps will collect in the entire year
+We want find the value of our bills we need to charge at the end of each month. The bill is calculated at the sum of the purchases a company creates minus the value of the payment they made in the same period.
+In our data payments are denoted as (-) so in our data we do an addition.
+Finally we want to see what the maximum amout of money we will collect in this year will be.
+```{r}
+Bill_Data <- Purchase_Data %>%
+  select(month, Company, Spend, Payment) %>%
+  group_by(month, Company) %>%
+  summarise(sum_spend = sum(Spend, na.rm = TRUE), sum_payment = sum(Payment, na.rm = TRUE),
+            Bill = sum_spend + sum_payment)
+max(Bill_Data$Bill)
+```
+## What is the dollar amount of each customers highest bill
+Now we want to see what is the dollar amount of the higest bill for each customer. This is the amount of money that each company owes. 
+```{r}
+Bill_Data %>%
+  select(Company, Bill) %>%
+  group_by(Company) %>%
+  summarise(max_bill = max(Bill))
+
+```
+
+
+## Profit margins is a flat percentage. 1st, 4th, 6th profitable person
+Now we want to see which companies are the most profitable for us. So we look at the total amount of purchases that is made by each specific company. Then we order them from the largest total purchase to the smallest and return the values we are looking for: The most profitable companies.
+```{r}
+Profitable_margin_customers <- Purchase_Data %>%
+  group_by(Company) %>%
+  summarise(total_purchase = sum(Spend, na.rm = TRUE)) %>%
+  arrange(desc(total_purchase))
+Profitable_margin_customers[1,]
+Profitable_margin_customers[4,]
+Profitable_margin_customers[6,]
+```
+
+
+## Credit Exposure
+Since most companies are not paying their entire orders in one payment, but have spread them out over an amount of time. We need to determine what our exposure is, that is, how much would we be in debt if our customers suddenly went bankrupt. We can see that some months we are (-) which means that these months companies made enough payments to push us into cash flow positive territory.
+```{r}
+Bill_Data %>%
+  group_by(month) %>%
+  summarise(credit_exposure = sum(Bill))
+```
+
+## Most Valueable Customer YTD. If we go off the same as in question 4 and choose 1, 4, 6
+We have looked at the most valueable customer when it comes to the total amount of purchases made, but now we are looking for the most valueable customers that are making the most payments on their purchases.
+```{r}
+Customer_Payments <- Purchase_Data %>%
+  group_by(Company) %>%
+  summarise(total_payments = sum(Payment, na.rm = TRUE)) %>%
+  arrange(total_payments)
+Customer_Payments[1,]
+Customer_Payments[4,]
+Customer_Payments[6,]
+```
+
+## The Highest Payments Per Month by each Company
+We can break down our information of payments to look at who is making the highest payment by month.
+```{r}
+Customer_Payments_month1 <- Purchase_Data %>%
+  group_by(Company, month) %>%
+  summarise(total_payments = sum(Payment, na.rm = TRUE)) %>%
+  group_by(month) %>%
+  summarise(total_payments = min(total_payments))
+Customer_Payments_month2 <- Purchase_Data %>%
+  group_by(Company, month) %>%
+  summarise(total_payments = sum(Payment, na.rm = TRUE))
+Customer_Payments_month <- left_join(Customer_Payments_month1, Customer_Payments_month2, by = c('month', 'total_payments'))
+
+Customer_Payments_month
+```
+
+
+
+
