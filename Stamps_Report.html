@@ -139,21 +139,17 @@ $(document).ready(function () {
 <h2>Billing for each Company at the end of the month. This is the largest bill that Stamps will collect in the entire year</h2>
 <p>We want find the value of our bills we need to charge at the end of each month. The bill is calculated at the sum of the purchases a company creates minus the value of the payment they made in the same period. In our data payments are denoted as (-) so in our data we do an addition. Finally we want to see what the maximum amout of money we will collect in this year will be.</p>
 <pre class="r"><code>Bill_Data &lt;- Purchase_Data %&gt;%
-  select(month, Company, Spend, Payment) %&gt;%
   group_by(month, Company) %&gt;%
-  summarise(sum_spend = sum(Spend, na.rm = TRUE), sum_payment = sum(Payment, na.rm = TRUE),
-            Bill = sum_spend + sum_payment)
-max(Bill_Data$Bill)</code></pre>
+  summarise(sum_spend = sum(Spend, na.rm = TRUE), sum_payment = sum(Payment, na.rm = TRUE), Bill = sum_spend + sum_payment)
+max(Bill_Data$Bill) </code></pre>
 <pre><code>## [1] 9059216</code></pre>
 </div>
 <div id="what-is-the-dollar-amount-of-each-customers-highest-bill" class="section level2">
 <h2>What is the dollar amount of each customers highest bill</h2>
 <p>Now we want to see what is the dollar amount of the higest bill for each customer. This is the amount of money that each company owes.</p>
 <pre class="r"><code>Bill_Data %&gt;%
-  select(Company, Bill) %&gt;%
   group_by(Company) %&gt;%
-  summarise(max_bill = max(Bill))</code></pre>
-<pre><code>## Adding missing grouping variables: `month`</code></pre>
+  summarise(max_bill = max(Bill)) </code></pre>
 <pre><code>## # A tibble: 19 x 2
 ##    Company  max_bill
 ##    &lt;chr&gt;       &lt;dbl&gt;
@@ -274,6 +270,64 @@ Customer_Payments_month</code></pre>
 ## 10 10         - 6240000 Michael 
 ## 11 11         -45000000 Mary    
 ## 12 12         - 9923400 Eddy</code></pre>
+</div>
+<div id="total-amount-of-purchases-by-each-company-for-each-billing-cycle" class="section level2">
+<h2>Total Amount of Purchases by each Company for each Billing Cycle</h2>
+<p>Here we want to see what the total amount of purchases in dollar value is for each company in the billing cycle beginning on the 16th of every month and ending on the 15th.</p>
+<pre class="r"><code>Billing_Cycle &lt;- left_join(January_Billing_Cycle, February_Billing_Cycle, by='Company') %&gt;%
+  left_join(., March_Billing_Cycle, by = &quot;Company&quot;) %&gt;%
+  left_join(., April_Billing_Cycle, by='Company') %&gt;%
+  left_join(., May_Billing_Cycle, by = &quot;Company&quot;) %&gt;%
+  left_join(., June_Billing_Cycle, by = 'Company') %&gt;%
+  left_join(., July_Billing_Cycle, by= 'Company') %&gt;%
+  left_join(., August_Billing_Cycle, by = &quot;Company&quot;) %&gt;%
+  left_join(., September_Billing_Cycle, by = &quot;Company&quot;) %&gt;%
+  left_join(., October_Billing_Cycle, by = &quot;Company&quot;) %&gt;%
+  left_join(., November_Billing_Cycle, by = &quot;Company&quot;)
+Billing_Cycle</code></pre>
+<pre><code>## # A tibble: 19 x 12
+##    Company   January February   March   April     May    June    July
+##    &lt;chr&gt;       &lt;dbl&gt;    &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;
+##  1 Ashley    3098183  5745574 3138154 4348063 4111703 2894911 1805020
+##  2 Daniel    5456225  4291621 5720926 5752545 6390772 4940389 6886136
+##  3 David     2628400  4991700 4945100 5000600 4431500 2214500 5753400
+##  4 Eddy      4261600  1369600 5117200 2938300 6096200 6313500 2228200
+##  5 Frank     4209800  3626900 9199100 4813100 1254100 2907300 5482600
+##  6 George    4755520  1926960 2246930 2627170 5117280 3466190 3450860
+##  7 Helen     3568047  5011199 3311189 3927736 3635539 4842149 3960818
+##  8 Jennifer  2719514  1572964 2797997 3438740 3562300 4700405 6040675
+##  9 Karen     2659484  6536110 6626620 3754103 3879444 1436659 3575490
+## 10 Lizzy     5855749  5027807 3960768 1804324 3085114 1635378 1164010
+## 11 Mary      3342360  5376971 6827838 4410938 3980587 3242041 4948087
+## 12 Michael   2989700  6417600 3788500 2579400 3942500 5546300 3118400
+## 13 Nancy     5617931  2673948 4897152 3668491 3387715 3482032 5612720
+## 14 Patricia  6038053  2981111 3234581 3738710 2083005 1936890 5131643
+## 15 Scott    12252657  3909827 8462021 4997324 4598806 5246486 3186489
+## 16 Sean      6280400  3491600 4441500 5407500 4825400 3790000 2399400
+## 17 Susan     3972893  2992308 2487797 4302904 1402766 4096346 2547483
+## 18 Tom       4363200  5899200 2883800 4415500 4467100 3712900  635700
+## 19 Walter    5893200  3083800 5308200 5162900 1810600 2496300 8944200
+##     August September October November
+##      &lt;dbl&gt;     &lt;dbl&gt;   &lt;dbl&gt;    &lt;dbl&gt;
+##  1 2535477   1346772 2784222  7039906
+##  2 3160526   2591146 5102280  3832227
+##  3 7170400   4590400 6339000  4653100
+##  4 5576500   4020200 4868600   671700
+##  5 3600200   3745700 2895000  4855900
+##  6 2092020   2261770 1616300  3822770
+##  7 2213471   3778384 7238745  3211923
+##  8 2138248   3935939 5368405  1634365
+##  9 2435576   4453286 3445842  3363250
+## 10 2602199   4014915 2463920  4102647
+## 11 3038473   2587975 7442342  3927270
+## 12 3153300   4720900 4178000  4313000
+## 13 4176496   1760638 2159807  6102830
+## 14 3977498   4717999 2740970  3272324
+## 15 3649871   5208052 4077504  7006828
+## 16 4497000   3857800 9199300  5509400
+## 17 5343591   3589804 6727223  2599159
+## 18 2182300   6500700 4291700  4677800
+## 19 3967400   4853200 6625000  3386800</code></pre>
 </div>
 
 

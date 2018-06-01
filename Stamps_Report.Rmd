@@ -8,12 +8,68 @@ output: html_document
 ```{r include=FALSE}
 library(tidyverse)
 library(dplyr)
+options(scipen=999)
+options(tibble.width = Inf)
 
 Purchase_Data <- readxl::read_excel("2018-03-12 Stamps.com Excel assessment.xlsx", 
                             sheet = "Purchase Payment Data")
 Purchase_Data$Date <- as.Date(Purchase_Data$Date, format = '%m/%d/%Y')
 Purchase_Data <- Purchase_Data %>%
   mutate(month = format(Date, "%m"))
+January_Billing_Cycle <- Purchase_Data[Purchase_Data$Date >= "2017-01-16" & Purchase_Data$Date <= "2017-02-15",]
+January_Billing_Cycle <- January_Billing_Cycle %>%
+                          group_by(Company) %>%
+                          summarise(January = sum(Spend, na.rm = TRUE))
+#February's Billing Cycle
+February_Billing_Cycle <- Purchase_Data[Purchase_Data$Date >= "2017-02-16" & Purchase_Data$Date <= "2017-03-15",]
+February_Billing_Cycle <- February_Billing_Cycle %>%
+                          group_by(Company) %>%
+                          summarise(February = sum(Spend, na.rm = TRUE))
+#March's Billing Cycle
+March_Billing_Cycle <- Purchase_Data[Purchase_Data$Date >= "2017-03-16" & Purchase_Data$Date <= "2017-04-15",]
+March_Billing_Cycle <- March_Billing_Cycle %>%
+                        group_by(Company) %>%
+                        summarise(March = sum(Spend, na.rm = TRUE))
+#April's Billing Cycle
+April_Billing_Cycle <- Purchase_Data[Purchase_Data$Date >= "2017-04-16" & Purchase_Data$Date <= "2017-05-15",]
+April_Billing_Cycle <- April_Billing_Cycle %>%
+                        group_by(Company) %>%
+                        summarise(April = sum(Spend, na.rm = TRUE))
+#May's Billing Cycle
+May_Billing_Cycle <- Purchase_Data[Purchase_Data$Date >= "2017-05-16" & Purchase_Data$Date <= "2017-06-15",]
+May_Billing_Cycle <- May_Billing_Cycle %>%
+                      group_by(Company) %>%
+                      summarise(May = sum(Spend, na.rm = TRUE))
+#June's Billing Cycle
+June_Billing_Cycle <- Purchase_Data[Purchase_Data$Date >= "2017-06-16" & Purchase_Data$Date <= "2017-07-15",]
+June_Billing_Cycle <- June_Billing_Cycle %>%
+                      group_by(Company) %>%
+                      summarise(June = sum(Spend, na.rm = TRUE))
+#July's Billing Cycle
+July_Billing_Cycle <- Purchase_Data[Purchase_Data$Date >= "2017-07-16" & Purchase_Data$Date <= "2017-08-15",]
+July_Billing_Cycle <- July_Billing_Cycle %>%
+                      group_by(Company) %>%
+                      summarise(July = sum(Spend, na.rm = TRUE))
+#August's BIlling Cycle
+August_Billing_Cycle <- Purchase_Data[Purchase_Data$Date >= "2017-08-16" & Purchase_Data$Date <= "2017-09-15",]
+August_Billing_Cycle <- August_Billing_Cycle %>%
+                        group_by(Company) %>%
+                        summarise(August = sum(Spend, na.rm = TRUE))
+#September's Billing Cycle
+September_Billing_Cycle <- Purchase_Data[Purchase_Data$Date >= "2017-09-16" & Purchase_Data$Date <= "2017-10-15",]
+September_Billing_Cycle <- September_Billing_Cycle %>%
+                            group_by(Company) %>%
+                            summarise(September = sum(Spend, na.rm = TRUE))
+#October's Billing Cycle
+October_Billing_Cycle <- Purchase_Data[Purchase_Data$Date >= "2017-10-16" & Purchase_Data$Date <= "2017-11-15",]
+October_Billing_Cycle <- October_Billing_Cycle %>%
+                          group_by(Company) %>%
+                          summarise(October = sum(Spend, na.rm = TRUE))
+#November's Billing Cycle
+November_Billing_Cycle <- Purchase_Data[Purchase_Data$Date >= "2017-11-16" & Purchase_Data$Date <= "2017-12-15",]
+November_Billing_Cycle <- November_Billing_Cycle %>%
+                          group_by(Company) %>%
+                          summarise(November = sum(Spend, na.rm = TRUE))
 ```
 
 
@@ -35,20 +91,16 @@ In our data payments are denoted as (-) so in our data we do an addition.
 Finally we want to see what the maximum amout of money we will collect in this year will be.
 ```{r}
 Bill_Data <- Purchase_Data %>%
-  select(month, Company, Spend, Payment) %>%
   group_by(month, Company) %>%
-  summarise(sum_spend = sum(Spend, na.rm = TRUE), sum_payment = sum(Payment, na.rm = TRUE),
-            Bill = sum_spend + sum_payment)
-max(Bill_Data$Bill)
+  summarise(sum_spend = sum(Spend, na.rm = TRUE), sum_payment = sum(Payment, na.rm = TRUE), Bill = sum_spend + sum_payment)
+max(Bill_Data$Bill) 
 ```
 ## What is the dollar amount of each customers highest bill
 Now we want to see what is the dollar amount of the higest bill for each customer. This is the amount of money that each company owes. 
 ```{r}
 Bill_Data %>%
-  select(Company, Bill) %>%
   group_by(Company) %>%
-  summarise(max_bill = max(Bill))
-
+  summarise(max_bill = max(Bill)) 
 ```
 
 
@@ -101,6 +153,21 @@ Customer_Payments_month <- left_join(Customer_Payments_month1, Customer_Payments
 Customer_Payments_month
 ```
 
+## Total Amount of Purchases by each Company for each Billing Cycle
+Here we want to see what the total amount of purchases in dollar value is for each company in the billing cycle beginning on the 16th of every month and ending on the 15th.
+```{r }
+Billing_Cycle <- left_join(January_Billing_Cycle, February_Billing_Cycle, by='Company') %>%
+  left_join(., March_Billing_Cycle, by = "Company") %>%
+  left_join(., April_Billing_Cycle, by='Company') %>%
+  left_join(., May_Billing_Cycle, by = "Company") %>%
+  left_join(., June_Billing_Cycle, by = 'Company') %>%
+  left_join(., July_Billing_Cycle, by= 'Company') %>%
+  left_join(., August_Billing_Cycle, by = "Company") %>%
+  left_join(., September_Billing_Cycle, by = "Company") %>%
+  left_join(., October_Billing_Cycle, by = "Company") %>%
+  left_join(., November_Billing_Cycle, by = "Company")
+Billing_Cycle
+```
 
 
 
