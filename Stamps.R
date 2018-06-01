@@ -1,7 +1,6 @@
 library(tidyverse)
 library(dplyr)
-library(data.table) #Used to set names
-library(plyr)
+
 #Going to import the information
 
 
