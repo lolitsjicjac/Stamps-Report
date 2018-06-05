@@ -1,6 +1,9 @@
 library(tidyverse)
 library(dplyr)
 
+options(scipen=999)
+
+
 #Going to import the information
 
 
@@ -8,7 +11,8 @@ Purchase_Data <- readxl::read_excel("2018-03-12 Stamps.com Excel assessment.xlsx
                                     sheet = "Purchase Payment Data")
 Purchase_Data$Date <- as.Date(Purchase_Data$Date, format = '%m/%d/%Y')
 Purchase_Data <- Purchase_Data %>%
-  mutate(month = format(Date, "%m"))
+  mutate(month = format(Date, "%m"), 
+         day_of_week = lubridate::wday((Date), label = TRUE))
 
 #1. Show total amount of purchases in each month by each company 
 Purchase_Data %>%
@@ -168,6 +172,31 @@ Billing_Cycle <- left_join(January_Billing_Cycle, February_Billing_Cycle, by='Co
 #7) Finally we have the final answer in a data frame that shows the billing cycle
 #of each company for their purchase in that time
 Billing_Cycle
+
+
+
+############ Misc work ########################
+#Getting ready to create some machine learning for a forecast of future purchases by each company
+#for the year of 2018
+Purchase_Data %>%
+  ggplot(aes(x = Date, y = Spend, color = Company))+
+  facet_wrap(~ Company, ncol = 5, scales = 'free')+
+  geom_point(aes(color = day_of_week), na.rm = TRUE)+
+  geom_line(na.rm = TRUE, show.legend = FALSE)+
+  geom_smooth(na.rm = TRUE, color = 'black')
+
+
+Purchase_Data %>%
+  filter(Purchase_Data$Company == 'Scott') %>%
+  group_by(month, Company) %>%
+  summarise(sum = sum(Spend, na.rm = TRUE)) %>%
+  ggplot(aes(x = month, y = sum))+
+  geom_line(na.rm = TRUE, show.legend = FALSE)+
+  geom_point(na.rm = TRUE)
+  
+
+
+
 
 
 

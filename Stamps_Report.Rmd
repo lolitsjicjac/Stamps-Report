@@ -8,14 +8,17 @@ output: html_document
 ```{r include=FALSE}
 library(tidyverse)
 library(dplyr)
+library(tidyquant)
 options(scipen=999)
 options(tibble.width = Inf)
+options(tibble.height = Inf)
 
 Purchase_Data <- readxl::read_excel("2018-03-12 Stamps.com Excel assessment.xlsx", 
                             sheet = "Purchase Payment Data")
 Purchase_Data$Date <- as.Date(Purchase_Data$Date, format = '%m/%d/%Y')
 Purchase_Data <- Purchase_Data %>%
-  mutate(month = format(Date, "%m"))
+  mutate(month = format(Date, "%m"),
+         day_of_week = wday((Date), label = TRUE))
 January_Billing_Cycle <- Purchase_Data[Purchase_Data$Date >= "2017-01-16" & Purchase_Data$Date <= "2017-02-15",]
 January_Billing_Cycle <- January_Billing_Cycle %>%
                           group_by(Company) %>%
@@ -167,6 +170,24 @@ Billing_Cycle <- left_join(January_Billing_Cycle, February_Billing_Cycle, by='Co
   left_join(., October_Billing_Cycle, by = "Company") %>%
   left_join(., November_Billing_Cycle, by = "Company")
 Billing_Cycle
+```
+
+## Visualizing our Data
+Here we want to see how the purchases of all the companies look across the entire year of 2017.
+Plotting each respective company we can go ahead and smooth out the data to see if we can determine
+any form of trend by each company. This will be a start for our machine learning to come for the forecasting
+of the year of 2018 by each company.
+
+```{r fig.width= 10, fig.height= 20}
+Purchase_Data %>%
+  ggplot(aes(x = Date, y = Spend, group = 1))+
+  facet_wrap(~ Company, ncol = 2, scales = 'free')+
+  geom_point(aes(color = day_of_week), na.rm = TRUE)+
+  geom_line(na.rm = TRUE, show.legend = FALSE, color = palette_light()[[1]], alpha = 0.8)+
+  geom_smooth(na.rm = TRUE, color = 'blue')+
+  scale_color_manual(values = palette_light())+
+  theme_tq()+
+  labs(color = "Days of the Week", title = "Purchases From The Entire Year by each Company", x = 'Days')
 ```
 
 
