@@ -1,7 +1,6 @@
 ---
-title: "Stamps Report"
+title: "Stamps.com Financial Report with Future Forecasting for 2018"
 author: "Alberto Castillo"
-date: "5/31/2018"
 output: html_document
 ---
 
@@ -9,6 +8,10 @@ output: html_document
 library(tidyverse)
 library(dplyr)
 library(tidyquant)
+library(caret)
+library(broom)
+library(timetk)
+library(modelr)
 options(scipen=999)
 options(tibble.width = Inf)
 options(tibble.height = Inf)
@@ -73,6 +76,163 @@ November_Billing_Cycle <- Purchase_Data[Purchase_Data$Date >= "2017-11-16" & Pur
 November_Billing_Cycle <- November_Billing_Cycle %>%
                           group_by(Company) %>%
                           summarise(November = sum(Spend, na.rm = TRUE))
+
+
+#This is the total spend for the entire year.
+purchase_spend <- Purchase_Data %>%
+                  group_by(Date, day_of_week) %>%
+                  summarise(total_spend = sum(Spend, na.rm = TRUE))
+#Now we are going to create out training and test data to go ahead an do our machine learning
+#Here just set the entire data set to training and then later we will filter out to have our test
+#Data so that we can incorporate all of the values.
+purchase_spend <- purchase_spend %>%
+  mutate(model = ifelse(Date <= '2017-12-31', 'train', 'test'))
+
+#Looking at our Data . Ignore this bc our data is sort so we must include all of it in our training.
+purchase_spend %>%
+  ggplot(aes(x = Date, y = total_spend, color = model))+
+  geom_point(alpha = .5)+
+  geom_line(alpha = .5)+
+  scale_color_manual(values = palette_light())+
+  theme_tq()
+#Here we are augmenting the time series. So we have to make sure that the values that are in the 
+#tk_augment are not going to overlap with the current names/labels we have in our data.
+#So we make sure to change any name that may cause some problems to the variables that the 
+#augmentation adds on to the data
+purchase_spend_aug <- purchase_spend %>%
+  rename(date = Date) %>%
+  select(model, date, total_spend) %>%
+  tk_augment_timeseries_signature()
+purchase_spend_aug <- purchase_spend_aug[complete.cases(purchase_spend_aug),]
+
+#Preprocess
+#We want to get rid of values that will contribute nothing to our model. So values that do not 
+#correlate
+library(matrixStats)
+#Here we are now creating a data frame that will return to us all of the variables with have a 
+#0 correlation with our original augmented data set. We filter at the end to make sure it is all the 
+#values that are 0
+(var <- data.frame(colnames = colnames(purchase_spend_aug[, sapply(purchase_spend_aug, is.numeric)]),
+                  colvars = colVars(as.matrix(purchase_spend_aug[, sapply(purchase_spend_aug, is.numeric)]))) %>%
+  filter(colvars == 0))
+#Here we are selecting our original augmentation and now using the one_of function to call all 
+#of the variables that are present in the augmented data that match the var data, which is all the values
+#which do no correlate with the data, and thus removes them.
+purchase_spend_aug <- select(purchase_spend_aug, -one_of(as.character(var$colnames)))
+#Now we remove those highly correlated values
+library(ggcorrplot)
+cor <- cor(purchase_spend_aug[, sapply(purchase_spend_aug, is.numeric)])
+p.cor <- cor_pmat(purchase_spend_aug[, sapply(purchase_spend_aug, is.numeric)])
+ggcorrplot(cor, type = 'upper', outline.col = 'white', hc.order = TRUE, p.mat = p.cor,
+           colors = c(palette_light()[1], 'white', palette_light()[2]))
+
+cor_cut <- findCorrelation(cor, cutoff=0.9) 
+purchase_spend_aug <- select(purchase_spend_aug, -one_of(colnames(cor)[cor_cut]))
+#Modeling. Here we must be sure to pick our testing data. Since out data is one full year (jan-dec)
+#We had to include the entire data in training because then our testing data will have values that are
+#also present in the data. By changing the range of our testing we can get a much more solid prediction our
+#our actual data from our predicted values.
+train <- purchase_spend_aug %>%
+  filter(model == 'train') %>%
+  select(-model)
+test <- purchase_spend_aug %>%
+  filter(date >= '2017-09-30') %>%
+  mutate(model = 'test')
+
+#Here we are creating a GLM regression for our data
+fit_lm <- glm(total_spend ~., data = train)
+
+#Examining out model by visualizing how it is coming
+augment(fit_lm) %>%
+  ggplot(aes(x= date, y = .resid))+
+  geom_hline(yintercept = 0, color = 'red')+
+  geom_point(alpha = .5)+
+  geom_smooth()
+
+#Now we will add predictions and residuals for test data
+pred_test <- test %>%
+  add_predictions(fit_lm, 'pred_lm') %>%
+  add_residuals(fit_lm, 'resid_lm')
+pred_test %>%
+  ggplot(aes(x = date, y = resid_lm))+
+  geom_hline(yintercept = 0, color = 'red')+
+  geom_point(alpha = .5)+
+  geom_smooth()
+
+#Now we can compare our predicted data with the actual test data
+pred_test %>%
+  gather(x,y, total_spend, pred_lm) %>%
+  ggplot(aes(x = date, y=y, color = x))+
+  geom_point(alpha = .5)+
+  geom_line(alpha=.5)+
+  scale_color_manual(values = palette_light())+
+  theme_tq()
+
+#Forecasting
+#Extracting the index (to create future time points we extract time index)
+idx <- purchase_spend %>%
+  tk_index()
+
+purchase_spend_aug %>%
+  ggplot(aes(x = date, y = diff))+
+  geom_point(alpha = .5, aes(color = as.factor(diff)))+
+  geom_line(alpha = .5)+
+  scale_color_manual(values = palette_light())+
+  theme_tq()
+
+#Finding the days that are missing from our data
+purchase_spend_aug %>%
+  select(date, wday.lbl, diff) %>%
+  filter(diff > 86400) %>%
+  mutate(days_missing = diff / 86400 - 1) #here we are looking for those diff > 0 bc if 0 then it is ok and not skip day
+
+#no values larger than this
+purchase_spend_aug %>%
+  select(date, wday.lbl, diff) %>%
+  filter(diff > 172800) %>%
+  mutate(days_missing = diff / 86400 - 1)
+
+#This is the days that are skipped in our data. So we can be sure they might be skipped in our forecast.
+off_days <- c('2018-01-01', '2018-03-04', '2018-04-26') %>%
+ ymd()
+
+#Here we are creating our future values for the days
+idx_future <- idx %>%
+  tk_make_future_timeseries(n_future = 365, inspect_weekdays = TRUE, skip_values = off_days)
+idx_future %>%
+  tk_get_timeseries_signature() %>%
+  ggplot(aes(x = index, y = diff))+
+  geom_point(alpha = .5, aes(color = as.factor(diff)))+
+  geom_line(alpha = .5)+
+  scale_color_manual(values = palette_light())+
+  theme_tq()
+
+#Now we are adding our future values to our prediction data
+data_future <- idx_future %>%
+  tk_get_timeseries_signature() %>%
+  rename(date = index)
+pred_future <- predict(fit_lm, newdata = data_future)
+pred_future <- data_future %>%
+  select(date) %>%
+  add_column(total_spend = pred_future)
+
+
+#We want to be sure to include our standard deviations so that we can go ahead and create the range
+#for our standard error when we start to plot our graph.
+test_residuals <- pred_test$resid_lm
+test_resid_sd <- sd(test_residuals, na.rm = TRUE)
+
+#The values for the future predictions kept coming out negative. (not sure about this?)
+#Went ahead and just changed the values to absolute since we are dealing with purchases and we cannot have
+#negative purchases.
+pred_future$total_spend <- abs(pred_future$total_spend)
+pred_future <- pred_future %>%
+  mutate(
+    lo.95 = (total_spend) - 1.96 * test_resid_sd,
+    lo.80 = (total_spend) - 1.28 * test_resid_sd,
+    hi.80 = (total_spend) + 1.28 * test_resid_sd,
+    hi.95 = (total_spend) + 1.96 * test_resid_sd
+      )
 ```
 
 
@@ -176,7 +336,7 @@ Billing_Cycle
 Here we want to see how the purchases of all the companies look across the entire year of 2017.
 Plotting each respective company we can go ahead and smooth out the data to see if we can determine
 any form of trend by each company. This will be a start for our machine learning to come for the forecasting
-of the year of 2018 by each company.
+of the year of 2018 by each company. We can see some form of patterns in the data as some companies tend to decrease their orders while others have a strong consistency of orders.
 
 ```{r fig.width= 10, fig.height= 20}
 Purchase_Data %>%
@@ -190,5 +350,24 @@ Purchase_Data %>%
   labs(color = "Days of the Week", title = "Purchases From The Entire Year by each Company", x = 'Days')
 ```
 
+## Forecasting for the Year of 2018
+Here we are forecasting the pruchases of the entire year of 2018. We are not considering specific companies, we keep every else constant and only focus on the total sales. We can see that next year the purchases will start off strong with an increase in purchases and continue to increase until about half-way through the year. Then we can expect that purchases will begin to slow down into December but still the total amount of purchases will be at a much higher average than that of 2017. We can only make this slight prediction since our data set is only for a year so we cannot determine if there is a consistent patter, we would have to analyze more data in order to see if there is some sort of trend of every year there being a total increase in the whole amount of purchases, then proceed to slow down and consolidate. 
+```{r fig.width=10}
+purchase_spend %>%
+  select(Date, total_spend) %>%
+  rename(date = Date) %>%
+  ggplot(aes(x = date, y = total_spend))+
+  geom_point(alpha = .5)+
+  geom_line(alpha = .5)+
+  geom_ribbon(aes(ymin = lo.95, ymax = hi.95), data = pred_future,
+              fill = '#D5DBFF', color = NA, size = 0)+
+  geom_ribbon(aes(ymin = lo.80, ymax = hi.80, fill = key), data = pred_future,
+              fill = "#596DD5", color = NA, size = 0, alpha =.8)+
+  geom_point(aes(x = date, y = (total_spend)), data = pred_future,
+             alpha = .5, color = palette_light()[2], na.rm = TRUE)+
+  geom_smooth(aes(x = date, y = (total_spend)), data = pred_future,
+              method = 'loess', color = 'white', na.rm = TRUE)+
+  theme_tq()
 
+```
 
